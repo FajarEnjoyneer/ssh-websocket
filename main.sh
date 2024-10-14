@@ -21,22 +21,42 @@ fun_wsproxy() {
         fi
     }
 
-    download_wsproxy() {
-        echo "${YELLOW}Using local WebSocket proxy script...${RESET}"
-        if [[ -f ./wsproxy.py ]]; then
-            sudo cp ./wsproxy.py /root/wsproxy.py || {
-                echo "${RED}Failed to copy WebSocket proxy script.${RESET}"
-                exit 1
-            }
-        else
-            echo "${RED}wsproxy.py not found in the current directory!${RESET}"
+   create_virtualenv() {
+    echo "${YELLOW}Checking for virtual environment...${RESET}"
+    if [[ ! -d myenv ]]; then
+        echo "${YELLOW}Creating virtual environment...${RESET}"
+        python3 -m venv myenv || {
+            echo "${RED}Failed to create virtual environment.${RESET}"
             exit 1
-        fi
+        }
+    else
+        echo "${GREEN}Virtual environment 'myenv' already exists. Skipping creation.${RESET}"
+    fi
+}
+    install_wsproxy_requirements() {
+        echo "${YELLOW}Installing required Python packages...${RESET}"
+        source myenv/bin/activate
+        pip install websockets || {
+            echo "${RED}Failed to install required Python packages.${RESET}"
+            exit 1
+        }
+        deactivate
     }
+    
+    download_wsproxy() {
+   	 echo "${YELLOW}Checking for local WebSocket proxy script...${RESET}"
+   	 if [[ -f ./wsproxy.py ]]; then
+       	 echo "${GREEN}WebSocket proxy script found. No need to copy.${RESET}"
+  	  else
+       	 echo "${RED}wsproxy.py not found in the current directory!${RESET}"
+       	 exit 1
+   	 fi
+	}
+
+
 
     configure_wsproxy() {
         echo "${CYAN}Configuring WebSocket proxy...${RESET}"
-        pip install websockets
 
         read -p "${CYAN}Enter the hostname as CDN host: ${RESET}" cdn_host
         read -p "${CYAN}Enter the SNI Host: ${RESET}" sni_host
@@ -68,8 +88,8 @@ After=network.target
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=/root
-ExecStart=/home/fajar/myenv/bin/python3 /root/wsproxy.py -p $http_port -s $ssh_port
+WorkingDirectory=$(pwd)
+ExecStart=$(pwd)/myenv/bin/python3 $(pwd)/wsproxy.py -p $http_port -s $ssh_port
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -136,6 +156,8 @@ EOF
         case $opt in
             "Install WebSocket Proxy")
                 download_wsproxy
+                create_virtualenv
+                install_wsproxy_requirements
                 configure_wsproxy
                 ;;
             "Start WebSocket Proxy")
